@@ -1,0 +1,600 @@
+---
+title: "trabalho de analise numerica"
+author: "Elizabeth, Isabela, Vinícius, Tiago e Alexia"
+date: "05 de junho de 2019"
+output: html_document
+---
+```{r}
+library(grid)
+library(gridExtra)
+library(xtable)
+```
+
+```{r}
+matriz_de_hilbert <- function(n){ #Gera uma matriz de Hilbert de dimensão n
+  
+  H <- matrix(0, n, n) 
+# n e o tamanho da matriz (quadrada) 
+# matriz H (matriz de hilbert)
+  
+  for(i in 1:n){
+   for(j in 1:n){
+     H[i,j] <- (1/(i+j-1))
+     
+    }
+  }
+ return(H)
+}
+
+grid.table((matriz_de_hilbert(2)))
+```
+
+```{r}
+matriz_Identidade <- function(n){ #Gera uma matriz de Identidade de dimensão n
+  
+  I <- matrix(0, n, n) 
+# n e o tamanho da matriz (quadrada) 
+# matriz I (matriz Identidade)
+  
+  for(i in 1:n){
+   for(j in 1:n){
+     if(i == j){
+     I[i,j] <- 1
+     }
+    }
+  }
+ return(I)
+}
+
+
+```
+
+```{r}
+fator_cholesky <- function(A){ #Encontra o fator de Cholesky
+  #preciso do pacote Matrix para rodar alguns comandos
+  require(Matrix)
+  library("Matrix")
+  
+  #transformando A numa classe de matriz
+  A <- as.matrix(A)
+  #n e o numero de colunas que tem na matriz A
+  n <- ncol(A)
+
+  #matriz quadrada definida positiva numero de colunas = numero de linhas
+  #inicializando a matriz Rt, que e a transposta da matriz R
+  Rt <- matrix(0,n, n)
+
+  #posso usar o comando do R: chol(A) para testar se esta certo meu codigo e se a matriz e definida positiva, se nao for o comando
+  #chol(A) retornara um erro acusando que a matriz nao e definida positiva
+  
+  #fatoracao de cholesky   
+  if(n > 0){
+    for (i in 1:n) {
+      for (j in 1:i){
+        soma <- 0
+        for(k in 1:j){
+          # %*% realiza o produto interno
+          soma <- (soma + Rt[i,k] %*% Rt[j,k])
+        }
+        #se A[i,i] <= 0 a matriz nao e difinida positiva(definicao do watkins algoritmo 1.4.17)
+        if(A[i,i] < 0 || A[i,] == 0){
+          return("matriz nao e definida positiva") 
+          break
+        }
+        if(i==j){
+          #calculo das diagonais
+          Rt[i,j] <- sqrt(A[i,i] - soma)
+        }else{
+          #calculo das outras posicoes 
+          Rt[i,j] <- (A[i,j] - soma) / Rt[j,j]
+        }
+      }
+    }  
+  }
+  R <- t(Rt)
+  #retorna a matriz transposta de R que e uma triangular inferior
+  return(R)
+}
+
+# pseudo-algoritmo:
+# A funcao recebe uma matriz A positiva definida
+# n = tamanho da matriz
+# Se n > 0
+#   Para i de 1 ate n faça 
+#     Para j de 1 ate i faça
+#       soma = 0
+#       Para k de i ate j faça
+#          soma = (soma + Rt(i,k) * Rt(j,k))
+#       fim
+#       se A(i,i) menor ou igual a 0
+#         saia
+#       se i igual j 
+#            Rt(i,j]) = raiz quadrada(A(i,i) - soma)
+#       senao
+#         Rt(i,j) = (A(i,j) - soma) / Rt(j,j)
+#     fim
+#   fim
+#   
+#   R = transposta de Rt
+#   retorna a matriz R
+        
+#testa o metodo de cholesky com a matriz de hilbert
+
+# n = 2 n pequeno
+fator_cholesky(matriz_de_hilbert(2))
+
+#n = 6 n medio
+grid.table(round(fator_cholesky(matriz_de_hilbert(6)), digits = 3))
+
+#n = 12 n grande 
+grid.table(round(fator_cholesky(matriz_de_hilbert(12)), digits = 3))
+
+#a partir de n = 13 comeca a dar problema para encontrar os valores da matriz com o cholesky
+
+
+```
+
+```{r} 
+qr.gramschmidt <- function(A){ #Decomposição QR por GS
+  require(Matrix)
+
+Q <- as.matrix(A) #Comeca com Q = A
+
+n <- ncol(A)
+m <- nrow(A)
+
+R <- matrix(0, n, n) #Comeca R
+
+for (k in 1:n){
+  v = A[,k] #vetores colunas de A
+   if (k > 1) { #pula quando k=1
+    for (c in 1:(k-1)) {
+     R[c,k] <-  A[,k] %*% Q[,c] #produto interno
+    
+     v <- v -  R[c,k] * Q[,c]  
+    }      
+}
+  R[k,k] <- sqrt(sum(v^2))
+  Q[,k] <- v / R[k,k]
+}
+
+res <- list('Q'=Q,'R'=R)
+return(res)
+}
+#pseudo-algoritmo GS
+#para k = 1,...,m
+ #para i = 1,...,k-1
+    #rik <- produto interno(vk,vi)
+ #para i = 1,...,k-1
+    #vk <- vk-vi*rik
+ #rkk <- norma2(vk)
+ #se rkk = 0, exit
+ #vk <- (1/rkk)*vk
+#V = Q*R
+
+grid.table(qr.gramschmidt(matriz_de_hilbert(2)))
+
+grid.table(qr.gramschmidt(matriz_de_hilbert(6)))
+
+grid.table(round(qr.gramschmidt(matriz_de_hilbert(12)), digits = 3))
+
+#grid.table(qr.gramschmidt(matriz_de_hilbert(20))
+
+```
+
+```{r}
+#Esta função faz a transofrmação QR da matriz A pelo método de Householder.
+#O argumento de entrada é a matriz A e a função retorna uma lista com as matrizes Q e R
+#Ideia do algoritmo: A ideia do algoritmo é, dada a matriz A, obter o seu posto (o menor valor dentre número de linhas e colunas) e obter todas as Qs utilizando a matriz identidade e o vetor alvo (vetor u (coluna da matriz A da qual queremos zerar os elementos)). Por fim, a Q é obtida multiplicando as Qs anteriores e R é obtido no produto matricial de Q com A.
+qr.householder <- function(A){
+  require(Matrix)
+  
+  R <- as.matrix(A) #Comeca com R = A
+  
+  n <- nrow(A)
+  m <- ncol(A)
+  H <- list() #A lista H vai armazenar as Q's
+  
+  if (n > m) { #posto de A
+    p <- m
+  } else {
+    p <- n
+  }
+  
+  for (k in 1:p) {
+    x <- R[k:n,k] #Vetor alvo
+    e <- as.matrix(c(1, rep(0, length(x)-1))) #replica o valor 
+    v <- sign(x[1]) * sqrt(sum(x^2)) * e + x #vetor v
+    
+    u <- v / sqrt(sum(v^2)) #normalizacao de v
+    
+    #Achando matriz Qk
+    Qk <- diag(length(x)) - 2 * as.vector(u %*% t(u)) 
+    if (k > 1) { #Para os vetores alvos a partir do 2
+      Qk <- bdiag(diag(k-1), Qk) #devemos acrescentar linhas para a mesma dimensao de A, criando matriz diagonal em bloco. Constrói uma matriz diagonal esparsa, unindo várias matrizes em bloco.
+    }
+    
+    #Armazenando as Q's
+    H[[k]] <- Qk
+    
+    R <- Qk %*% R #obtendo R
+  }
+
+  Q <- Reduce("%*%", H) #Obtendo Q multiplicando todas as Q's
+  res <- list('Q'=Q,'R'=R)
+  return(res)
+}
+
+#pseudo algoritmo:
+#Recebe a matriz A(n,n)
+#Para K = 1, ..., n-1, faça:
+#  determine o refletor Q(k) = I - (gama)(k)u(k)(u(k))^t #k é o índice
+#  (Q(k)(a(k,k)...a(n,k)))^t = (-tal(k) 0...0)^t
+#  Armazena u(k) sobre a(k,n:k+1) #k e n são índices
+#  a(kk) recebe -tal(k)
+
+#  gama(n) recebe a(nn) #n é ínidice
+
+#Retorna Q e R = (Q^t)A
+
+  
+
+#Testa método de householder com a matriz de hilbert:
+
+#n=2 n pequeno
+grid.table(round(qr.householder(matriz_de_hilbert(2))))#super rápido
+
+#n=6 n médio
+grid.table(round(qr.householder(matriz_de_hilbert(6)), digits = 3)) #rápido
+
+#n = 12 n grande
+grid.table(round(qr.householder(matriz_de_hilbert(12)), digits = 3)) #rápido
+
+#n = 20 n grande
+#grid.table(qr.householder(matriz_de_hilbert(20)))#rápido
+
+#Em todos os testes acima a precisão foi próxima do limite da máquina (10^-16)
+```
+
+```{r}
+
+  #Resolver o sistema Rt*Y = matriz B por substituicao direta
+
+substituicao_direta <- function(Rt, B){
+  
+  #n e o numero de colunas que tem na matriz Rt
+  n <- ncol(Rt)
+
+  #inicializando a matriz Y
+  Y <- matrix(0,n)
+  for (i in 1:n){
+    soma <- 0
+    for (j in 1:n){
+      if (i == j){
+        #calculo da matriz Y
+        Y[i] <- (B[i] - soma)/Rt[i,j]
+        break
+      } 
+      else{
+        soma <- soma + (Rt[i,j] %*% Y[j])
+      }  
+    }    
+  }
+  #retorna os valores da matriz Y
+  return(Y)
+}    
+
+# pseudo-algoritmo
+# A funcao recebe a matriz Rt triangular inferior e o vetor B
+# n = tamanho da matriz Rt
+# 
+# Para i de 1 ate n faça
+#   soma = 0
+#   Para j de 1 ate n faça
+#     se i igual a j
+#       Y(i) = (B(i) - soma)/Rt(i,j)
+#       saia
+#     senao
+#       soma = soma +(Rt(i,j) * Y(j))
+#   fim
+# fim
+# retorna Y
+
+
+
+
+
+
+```
+  
+```{r}
+
+ #Resolver o sistema R*x = Y 
+ #R e uma triangular superior
+ #R e o fator de cholesky
+ #posso usar o comando backsolve(t(Rt),Y) para testar se esta certo, onde t(Rt) = R
+
+retrosubstituicao <- function(Rt,Y){
+  
+  R <- Rt
+  #n e numero de colunas de R
+  n <- ncol(R)
+  
+  #inicializando o vetor X
+  X <- matrix(0,n)
+
+  #valor da ultima posicao do vetor X
+  X[n] <- Y[n]/R[n,n] 
+  
+  for (i in (n-1):1){
+    soma <- 0
+    for (j in (i+1):n){
+      soma <- soma + (R[i,j] %*% X[j])
+    }
+    X[i] <- (Y[i] - soma)/R[i,i]
+  }  
+  
+  #retorna os valores do vetor X
+  return(X)
+}
+
+# pseudo-algoritmo 
+# A funcao recebe Rt, que o fator de cholesky R e o vetor Y
+# n = tamanho da matriz Rt
+# X(n) = Y(n)/R(n,n)
+# para i de (n-1) ate 1
+#   soma = 0
+#   para j de (i+1) ate n
+#     soma = soma + (R(i,i) * X(j))
+#   fim
+#   X(i) = (Y(i) - soma)/R(i,i)
+# fim
+# retorna X
+
+```
+
+```{r}
+#Calcula a inversa da matriz A sem decomposição, não foi usado no nosso código, mas foi implementado para fins de comparação
+Inversa <- function(A){
+  n <- ncol(A)
+  X <- matrix(0,n,n)
+  for(i in 1:n){
+    X[,i] <- cbind(substituicao_direta(A, matriz_Identidade(n)[,i]))
+  }
+  return(X)
+}    
+
+#teste do calculo da inversa
+grid.table(Inversa(cbind(c(1,2,1),c(3,-1,1),c(1,3,4))))
+```
+
+```{r}
+#Realiza a operação de encontrar a inversa de qualquer matriz A através da decomposição de Cholesky, no nosso caso, calcula a inversa da matriz de Hilbert de dimensão n
+Inversa_por_Cholesky<- function(A){
+  n <- ncol(A)
+  R <- matrix(0,n,n)
+  Y <- matrix(0,n,n)
+  X <- matrix(0,n,n)
+   R <- fator_cholesky(A)
+   
+
+  for(i in 1:n){
+   Y[,i] <- cbind(substituicao_direta(t(R), matriz_Identidade(n)[,i])) #Resolve o sistema linear através da fatoração de Cholesky (A = Rt*R) Rt*Y = B 
+  }
+  for(i in 1:n){
+    X[,i] <- cbind(retrosubstituicao(R, Y[,i])) #R*X = B, B é a matriz Identidade e encontramos X = a inversa de A
+  }
+  return(X)
+}    
+
+#teste dos resultados das inversas por cholesky
+
+grid.table(round(Inversa_por_Cholesky(matriz_de_hilbert(2))))
+grid.table(round(Inversa_por_Cholesky(matriz_de_hilbert(6)), digits = 3))
+#grid.table(round(Inversa_por_Cholesky(matriz_de_hilbert(12)), digits = 3))
+
+```
+
+```{r}
+#Realiza a operação de encontrar a inversa de qualquer matriz A através da decomposição de Gram-Schmidt, no nosso caso, calcula a inversa da matriz de Hilbert de dimensão n
+Inversa_por_QR_GS<- function(A){
+  n <- ncol(A)
+  Q <- matrix(0,n,n)
+  R <- matrix(0,n,n)
+  Y <- matrix(0,n,n)
+  X <- matrix(0,n,n)
+  Q <- qr.gramschmidt(A)$Q
+  R <- qr.gramschmidt(A)$R
+
+  Y <- t(Q) %*% matriz_Identidade(n) #Faz Qt*B
+   
+  for(i in 1:n){
+    X[,i] <- cbind(retrosubstituicao(R, Y[,i])) #Resolve o sistema linear através da decomposição QR (A = Q*R) R*X = Qt*B 
+  }
+  return(X)
+}
+
+#teste dos resultados das inversas por QR_GS
+grid.table(Inversa_por_QR_GS(matriz_de_hilbert(2)))
+
+grid.table(Inversa_por_QR_GS(matriz_de_hilbert(6)))
+
+#grid.table(Inversa_por_QR_GS(matriz_de_hilbert(12)))
+
+#grid.table(Inversa_por_QR_GS(matriz_de_hilbert(20)))
+```
+
+```{r}
+#Realiza a operação de encontrar a inversa de qualquer matriz A através da decomposição de Householder, no nosso caso, calcula a inversa da matriz de Hilbert de dimensão n 
+Inversa_por_QR_HH<- function(A){
+  n <- ncol(A)
+
+  Y <- matrix(0,n,n)
+  X <- matrix(0,n,n)
+  Q <- qr.householder(A)$Q
+  R <- qr.householder(A)$R
+  
+  Y <- t(Q) %*% matriz_Identidade(n) #Faz Qt*B
+  
+  for(i in 1:n){
+    X[,i] <- cbind(retrosubstituicao(R, Y[,i]))  #Resolve o sistema linear através da decomposição QR (A = Q*R) R*X = Qt*B 
+  }
+  
+  return(X)
+}    
+
+grid.table(Inversa_por_QR_HH(matriz_de_hilbert(2)))
+
+grid.table(Inversa_por_QR_HH(matriz_de_hilbert(6)))
+
+#grid.table(Inversa_por_QR_HH(matriz_de_hilbert(12)))
+
+#grid.table(Inversa_por_QR_HH(matriz_de_hilbert(20)))
+```
+
+```{r}
+
+#Calcula a norma 1 da matriz A
+
+ Norma1 <- function(A){
+  n <- ncol(A)
+  Y <- matrix(0,n)
+  for (i in 1:n){
+    soma <- 0
+    for(j in 1:n){
+      soma <- soma + (abs(A[j,i]))
+    }
+    Y[i] <- soma
+  }
+  x <- max(Y)
+  return(x)
+}
+
+```
+
+```{r}
+#Comparaçoes dos metodos QR utilizando a norma1
+
+#comparando a norma1 da matriz de hilbert com a norma dos calculos de Q*R para os metodos do refletor
+# ver o valor de norma1 para cada n Norma1(matriz_de_hilbert(n)) e comparar se tem o mesmo valor para Norma1(teste_QRn)
+
+#para n = 2
+Norma1(matriz_de_hilbert(2))
+
+Q2 <- qr.householder(matriz_de_hilbert(2))$Q
+R2 <- qr.householder(matriz_de_hilbert(2))$R
+teste_QR2 <- Q2 %*% R2
+Norma1(teste_QR2)
+
+#para n = 6
+Norma1(matriz_de_hilbert(6))
+
+Q6 <- qr.householder(matriz_de_hilbert(6))$Q
+R6 <- qr.householder(matriz_de_hilbert(6))$R
+teste_QR6 <- Q6 %*% R6
+Norma1(teste_QR6)
+
+#para n = 12
+Norma1(matriz_de_hilbert(12))
+
+Q12 <- qr.householder(matriz_de_hilbert(12))$Q
+R12 <- qr.householder(matriz_de_hilbert(12))$R
+teste_QR12 <- Q12 %*% R12
+Norma1(teste_QR12)
+
+#para n = 20
+Norma1(matriz_de_hilbert(20))
+
+Q20 <- qr.householder(matriz_de_hilbert(20))$Q
+R20 <- qr.householder(matriz_de_hilbert(20))$R
+teste_QR20 <- Q20 %*% R20
+Norma1(teste_QR20)
+
+#comparando a norma1 da matriz de hilbert com a norma dos calculos de Q*R para os metodos gram schmidt
+# ver o valor de norma1 para cada n Norma1(matriz_de_hilbert(n)) e comparar se tem o mesmo valor para Norma1(teste_QR_QGn)
+
+#para n = 2
+Norma1(matriz_de_hilbert(2))
+
+QG2 <- qr.gramschmidt(matriz_de_hilbert(2))$Q
+RG2 <- qr.gramschmidt(matriz_de_hilbert(2))$R
+teste_QR_QG2 <- QG2 %*% RG2
+Norma1(teste_QR_QG2)
+
+#para n = 6
+Norma1(matriz_de_hilbert(6))
+
+QG6 <- qr.gramschmidt(matriz_de_hilbert(6))$Q
+RG6 <- qr.gramschmidt(matriz_de_hilbert(6))$R
+teste_QR_QG6 <- QG6 %*% RG6
+Norma1(teste_QR_QG6)
+
+
+#para n = 12
+Norma1(matriz_de_hilbert(12))
+
+QG12 <- qr.gramschmidt(matriz_de_hilbert(12))$Q
+RG12 <- qr.gramschmidt(matriz_de_hilbert(12))$R
+teste_QR_QG12 <- QG12 %*% RG12
+Norma1(teste_QR_QG12)
+
+#para n = 20
+Norma1(matriz_de_hilbert(20))
+
+QG20 <- qr.gramschmidt(matriz_de_hilbert(20))$Q
+RG20 <- qr.gramschmidt(matriz_de_hilbert(20))$R
+teste_QR_QG20 <- QG20 %*% RG20
+Norma1(teste_QR_QG20)
+
+```
+
+
+
+```{r}
+
+#Calcula o número de condicionamento multiplicando a norma 1 de A e a norma 1 da inversa de A (A^-1)
+
+cond <- function(x,y){
+  cond <- x*y
+  return(cond)
+}
+
+#n = 2 para cholesky
+cond(Norma1(Inversa_por_Cholesky(matriz_de_hilbert(2))), Norma1(matriz_de_hilbert(2)))
+#n = 6
+cond(Norma1(Inversa_por_Cholesky(matriz_de_hilbert(6))), Norma1(matriz_de_hilbert(6)))
+#n = 12
+cond(Norma1(Inversa_por_Cholesky(matriz_de_hilbert(12))), Norma1(matriz_de_hilbert(12)))
+
+
+#n = 2 para gram_schmidt
+
+cond(Norma1(Inversa_por_QR_GS(matriz_de_hilbert(2))), Norma1(matriz_de_hilbert(2)))
+
+#n = 6
+cond(Norma1(Inversa_por_QR_GS(matriz_de_hilbert(6))), Norma1(matriz_de_hilbert(6)))
+
+#n = 12
+cond(Norma1(Inversa_por_QR_GS(matriz_de_hilbert(12))), Norma1(matriz_de_hilbert(12)))
+
+#n = 20
+cond(Norma1(Inversa_por_QR_GS(matriz_de_hilbert(20))), Norma1(matriz_de_hilbert(20)))
+
+
+#n = 2 para Householder
+
+cond(Norma1(Inversa_por_QR_HH(matriz_de_hilbert(2))), Norma1(matriz_de_hilbert(2)))
+
+#n = 6
+cond(Norma1(Inversa_por_QR_HH(matriz_de_hilbert(6))), Norma1(matriz_de_hilbert(6)))
+
+#n = 12
+cond(Norma1(Inversa_por_QR_HH(matriz_de_hilbert(12))), Norma1(matriz_de_hilbert(12)))
+
+#n = 20
+cond(Norma1(Inversa_por_QR_HH(matriz_de_hilbert(20))), Norma1(matriz_de_hilbert(20)))
+
+
+```
+
+
